@@ -130,7 +130,7 @@ def _get_backend() -> str:
     keys manually without running setup.
     """
     configured = (_load_web_config().get("backend") or "").lower().strip()
-    if configured in {"parallel", "firecrawl", "tavily", "exa", "searxng", "brave-free", "ddgs", "xai"}:
+    if configured in {"parallel", "firecrawl", "tavily", "exa", "searxng", "brave-free", "ddgs", "xai", "keenable"}:
         return configured
 
     # Fallback for manual / legacy config — pick the highest-priority
@@ -146,6 +146,7 @@ def _get_backend() -> str:
         ("searxng", _has_env("SEARXNG_URL")),
         ("brave-free", _has_env("BRAVE_SEARCH_API_KEY")),
         ("ddgs", _ddgs_package_importable()),
+        ("keenable", True),
     )
     for backend, available in backend_candidates:
         if available:
@@ -208,6 +209,11 @@ def _is_backend_available(backend: str) -> bool:
         return _has_env("BRAVE_SEARCH_API_KEY")
     if backend == "ddgs":
         return _ddgs_package_importable()
+    if backend == "keenable":
+        # Always available — Keenable has a keyless public endpoint, and the
+        # plugin transparently switches to the authenticated endpoint when
+        # KEENABLE_API_KEY is set.
+        return True
     if backend == "xai":
         # Cheap probe — env var OR auth.json has OAuth tokens. Must not
         # call resolve_xai_http_credentials() here because the OAuth path
@@ -1155,11 +1161,11 @@ async def web_extract_tool(
 def check_web_api_key() -> bool:
     """Check whether the configured web backend is available."""
     configured = _load_web_config().get("backend", "").lower().strip()
-    if configured in {"exa", "parallel", "firecrawl", "tavily", "searxng", "brave-free", "ddgs", "xai"}:
+    if configured in {"exa", "parallel", "firecrawl", "tavily", "searxng", "brave-free", "ddgs", "xai", "keenable"}:
         return _is_backend_available(configured)
     return any(
         _is_backend_available(backend)
-        for backend in ("exa", "parallel", "firecrawl", "tavily", "searxng", "brave-free", "ddgs", "xai")
+        for backend in ("exa", "parallel", "firecrawl", "tavily", "searxng", "brave-free", "ddgs", "xai", "keenable")
     )
 
 

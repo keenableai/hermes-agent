@@ -280,7 +280,9 @@ class TestCheckWebApiKey:
         monkeypatch.setenv("SEARXNG_URL", "http://localhost:8080")
         assert web_tools.check_web_api_key() is True
 
-    def test_no_credentials_fails(self, monkeypatch):
+    def test_no_credentials_still_passes_via_keenable(self, monkeypatch):
+        """SearXNG-specific availability check: with no provider keys, the
+        Keenable keyless public endpoint keeps ``check_web_api_key()`` True."""
         from tools import web_tools
         monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
         monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
@@ -291,7 +293,7 @@ class TestCheckWebApiKey:
         monkeypatch.delenv("SEARXNG_URL", raising=False)
         monkeypatch.setattr(web_tools, "_is_tool_gateway_ready", lambda: False)
         monkeypatch.setattr(web_tools, "check_firecrawl_api_key", lambda: False)
-        assert web_tools.check_web_api_key() is False
+        assert web_tools.check_web_api_key() is True
 
 
 # ---------------------------------------------------------------------------

@@ -601,9 +601,11 @@ class TestCheckWebApiKey:
             from tools.web_tools import check_web_api_key
             assert check_web_api_key() is True
 
-    def test_no_keys_returns_false(self):
+    def test_no_keys_returns_true_via_keenable(self):
+        """Keenable's keyless public endpoint counts as 'configured' — so
+        ``check_web_api_key()`` is True even when no provider keys are set."""
         from tools.web_tools import check_web_api_key
-        assert check_web_api_key() is False
+        assert check_web_api_key() is True
 
     def test_both_keys_returns_true(self):
         with patch.dict(os.environ, {

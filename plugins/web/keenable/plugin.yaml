@@ -1,0 +1,7 @@
+name: web-keenable
+version: 1.0.0
+description: "Keenable web search — a search API built for AI agents. Works without an API key via the public endpoint; set KEENABLE_API_KEY (https://keenable.ai/console) to use the authenticated endpoint."
+author: Keenable
+kind: backend
+provides_web_providers:
+  - keenable
