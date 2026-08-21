@@ -156,6 +156,27 @@ class TestKeylessCalls:
         assert out["success"] is False
         assert "EXA_API_KEY" in out["error"]
 
+    def test_keenable_search_asks_for_and_enforces_a_snippet_budget(self):
+        long_text = ("word " * 400).strip()  # ~2000 chars, what they really send
+        payload = {
+            "results": [
+                {"url": "https://a", "title": "A", "snippet": "line one\n\nline two"},
+                {"url": "https://b", "title": "B", "snippet": long_text},
+                {"url": "https://c", "title": "C", "snippet": "", "description": "meta"},
+            ]
+        }
+        with patch("requests.post") as post:
+            post.return_value.status_code = 200
+            post.return_value.json.return_value = payload
+            out = keyless_mcp.keenable_search_keyless("q", limit=3)
+        assert out["success"] is True
+        sent = post.call_args.kwargs["json"]
+        assert sent["snippet_max_length"] == keyless_mcp.KEENABLE_SNIPPET_CHARS
+        web = out["data"]["web"]
+        assert web[0]["description"] == "line one line two"  # collapsed to one line
+        assert len(web[1]["description"]) == keyless_mcp.KEENABLE_SNIPPET_CHARS
+        assert web[2]["description"] == "meta"  # description is the fallback
+
     def test_exa_extract_per_url(self):
         with patch.object(
             keyless_mcp, "mcp_call", return_value="# Page Title\nbody text"
@@ -286,6 +307,29 @@ class TestResolutionOrder:
             v for v in registry._keyless_preference() if v in ("exa", "parallel")
         )
         assert provider.name == expected
+
+    def test_keyed_keenable_beats_a_credential_free_ddgs(self, fresh_registry, monkeypatch):
+        """A KEENABLE_API_KEY must not lose the walk to an importable ddgs.
+
+        Step 2 of resolution only returns a provider when it is the *single*
+        available one, so with ddgs importable the walk decides — and that
+        walk is _LEGACY_PREFERENCE, which has to list keenable for a keyed
+        setup to be reachable at all.
+        """
+        from plugins.web.ddgs.provider import DDGSWebSearchProvider
+        from plugins.web.keenable.provider import KeenableWebSearchProvider
+
+        monkeypatch.setattr(registry, "_read_config_key", lambda *p: None)
+        monkeypatch.setattr(
+            "agent.web_search_provider.get_provider_env",
+            lambda name: "kn-key" if name == "KEENABLE_API_KEY" else "",
+            raising=True,
+        )
+        monkeypatch.setattr(DDGSWebSearchProvider, "is_available", lambda self: True)
+        registry.register_provider(KeenableWebSearchProvider())
+        registry.register_provider(DDGSWebSearchProvider())
+
+        assert registry.get_active_search_provider().name == "keenable"
 
     def test_keyless_ring_rotates_and_covers_all_vendors(self, fresh_registry, monkeypatch):
         monkeypatch.setattr(registry, "_read_config_key", lambda *p: None)

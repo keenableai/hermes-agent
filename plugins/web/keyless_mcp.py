@@ -624,6 +624,25 @@ def firecrawl_extract_keyless(urls: List[str]) -> List[Dict[str, Any]]:
 KEENABLE_API_URL = "https://api.keenable.ai"
 _KEENABLE_TITLE = "hermes-agent"
 
+# Keenable returns whole-page text on every search result (~2k chars each),
+# an order of magnitude more than the excerpt the other ring vendors send, so
+# a 5-result search would spend ~10k chars of context on pages the agent has
+# not chosen to read. Ask their API for a budget AND enforce it locally:
+# snippet_max_length is a hint that rounds up to a word boundary. Reading a
+# full page is what web_extract is for.
+KEENABLE_SNIPPET_CHARS = 500
+
+
+def keenable_snippet(result: Dict[str, Any]) -> str:
+    """Result text as a single-line excerpt within the snippet budget.
+
+    ``snippet`` carries the page text; ``description`` is the page's meta
+    description, which comes back empty for most pages, so it is only a
+    fallback.
+    """
+    text = result.get("snippet") or result.get("description") or ""
+    return " ".join(str(text).split())[:KEENABLE_SNIPPET_CHARS]
+
 
 def keenable_search_keyless(query: str, limit: int = 5) -> Dict[str, Any]:
     """Keyless Keenable search → legacy search response shape.
@@ -637,7 +656,11 @@ def keenable_search_keyless(query: str, limit: int = 5) -> Dict[str, Any]:
     try:
         response = requests.post(
             f"{KEENABLE_API_URL}/v1/search/public",
-            json={"query": query, "max_results": max(1, int(limit))},
+            json={
+                "query": query,
+                "max_results": max(1, int(limit)),
+                "snippet_max_length": KEENABLE_SNIPPET_CHARS,
+            },
             headers={
                 "Content-Type": "application/json",
                 "X-Keenable-Title": _KEENABLE_TITLE,
@@ -669,9 +692,7 @@ def keenable_search_keyless(query: str, limit: int = 5) -> Dict[str, Any]:
             {
                 "url": result.get("url") or "",
                 "title": result.get("title") or "",
-                "description": result.get("snippet")
-                or result.get("description")
-                or "",
+                "description": keenable_snippet(result),
                 "position": i + 1,
             }
         )

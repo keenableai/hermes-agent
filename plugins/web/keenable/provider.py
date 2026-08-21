@@ -102,10 +102,16 @@ class KeenableWebSearchProvider(WebSearchProvider):
 
             import requests
 
+            from plugins.web.keyless_mcp import KEENABLE_SNIPPET_CHARS
+
             logger.info("Keenable search: '%s' (limit=%d)", query, limit)
             response = requests.post(
                 f"{_KEENABLE_API_URL}/v1/search",
-                json={"query": query, "max_results": min(max(1, int(limit)), 20)},
+                json={
+                    "query": query,
+                    "max_results": min(max(1, int(limit)), 20),
+                    "snippet_max_length": KEENABLE_SNIPPET_CHARS,
+                },
                 headers=_keenable_headers(api_key),
                 timeout=30,
             )
@@ -114,15 +120,15 @@ class KeenableWebSearchProvider(WebSearchProvider):
                 return {"success": False, "error": f"Keenable search failed: {detail}"}
             data = response.json()
 
+            from plugins.web.keyless_mcp import keenable_snippet
+
             web_results = []
             for i, result in enumerate(data.get("results") or []):
                 web_results.append(
                     {
                         "url": result.get("url") or "",
                         "title": result.get("title") or "",
-                        "description": result.get("snippet")
-                        or result.get("description")
-                        or "",
+                        "description": keenable_snippet(result),
                         "position": i + 1,
                     }
                 )
